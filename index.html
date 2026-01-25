@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Command Detector</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.20.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+            color: white;
+        }
+
+        .status-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .detected-command {
+            font-size: 48px;
+            font-weight: bold;
+            min-height: 60px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .confidence {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .info-label {
+            color: #1565c0;
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .info-text {
+            color: #0d47a1;
+            font-size: 14px;
+        }
+
+        .mic-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            font-size: 48px;
+            cursor: pointer;
+            margin: 30px auto;
+            display: block;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .mic-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.3);
+        }
+
+        .mic-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .mic-button.listening {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            }
+            50% { 
+                transform: scale(1.08);
+                box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+            }
+        }
+
+        .bluetooth-btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+
+        .bluetooth-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+
+        .bluetooth-btn.connected {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .commands-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .cmd-btn {
+            padding: 15px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .cmd-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .cmd-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .log-box {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 180px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px 8px;
+            border-radius: 4px;
+        }
+
+        .log-success { background: #c8e6c9; color: #2e7d32; }
+        .log-error { background: #ffcdd2; color: #c62828; }
+        .log-info { background: #bbdefb; color: #1565c0; }
+        .log-warning { background: #fff9c4; color: #f57f17; }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .mic-label {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: -15px;
+            margin-bottom: 20px;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Voice Command AI</h1>
+        <p class="subtitle">Say: UP, DOWN, LEFT, RIGHT, STOP</p>
+
+        <div class="status-box">
+            <div class="status-label">Detected Command</div>
+            <div class="detected-command" id="detectedCommand">---</div>
+            <div class="confidence" id="confidence"></div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-label">🤖 Model Status</div>
+            <div class="info-text" id="modelStatus">Initializing...</div>
+        </div>
+
+
+
+        <div class="info-box">
+            <div class="info-label">📡 Bluetooth Status</div>
+            <div class="info-text" id="bluetoothStatus">Not Connected</div>
+        </div>
+
+        <button class="mic-button" id="micBtn" onclick="toggleListening()" disabled>
+            🎙️
+        </button>
+        <div class="mic-label" id="micLabel">Loading...</div>
+
+        <button class="bluetooth-btn" id="bluetoothBtn" onclick="toggleBluetooth()">
+            📡 Connect to ESP32
+        </button>
+
+        <div class="section-title">Quick Test Commands</div>
+        <div class="commands-grid">
+            <button class="cmd-btn" onclick="testCommand('up')">⬆️ UP<br>(Forward)</button>
+            <button class="cmd-btn" onclick="testCommand('down')">⬇️ DOWN<br>(Backward)</button>
+            <button class="cmd-btn" onclick="testCommand('left')">⬅️ LEFT</button>
+            <button class="cmd-btn" onclick="testCommand('right')">➡️ RIGHT</button>
+            <button class="cmd-btn" onclick="testCommand('stop')">🛑 STOP</button>
+        </div>
+
+        <div class="section-title">Activity Log</div>
+        <div class="log-box" id="logBox"></div>
+    </div>
+
+    <script>
+        let recognizer = null;
+        let isListening = false;
+        let bluetoothDevice = null;
+        let bluetoothCharacteristic = null;
+
+        // Map model words to our commands
+        // Model has: up, down, left, right, stop, go, yes, no, etc.
+        const WORD_TO_COMMAND = {
+            'up': 'forward',
+            'go': 'forward',
+            'down': 'backward',
+            'left': 'left',
+            'right': 'right',
+            'stop': 'stop'
+        };
+        
+        const COMMAND_TO_ESP32 = {
+            'forward': 'F',
+            'backward': 'B',
+            'left': 'L',
+            'right': 'R',
+            'stop': 'S'
+        };
+
+        // Initialize model
+        async function init() {
+            try {
+                addLog('🔄 Loading TensorFlow.js...', 'info');
+                addLog('TF version: ' + tf.version.tfjs, 'info');
+                
+                if (typeof speechCommands === 'undefined') {
+                    throw new Error('speech-commands library not loaded');
+                }
+                
+                addLog('🔄 Creating recognizer...', 'info');
+                recognizer = speechCommands.create('BROWSER_FFT');
+                
+                addLog('🔄 Loading model...', 'info');
+                document.getElementById('modelStatus').textContent = '⏳ Downloading...';
+                
+                await recognizer.ensureModelLoaded();
+                
+                const words = recognizer.wordLabels();
+                addLog(`✅ Model loaded with ${words.length} words`, 'success');
+                addLog(`Available: ${words.join(', ')}`, 'info');
+                addLog(`📢 SAY: UP, DOWN, LEFT, RIGHT, STOP`, 'warning');
+                
+                document.getElementById('modelStatus').textContent = '✅ Ready!';
+                document.getElementById('micBtn').disabled = false;
+                document.getElementById('micLabel').textContent = 'Press to Start';
+                
+            } catch (error) {
+                console.error('Full error:', error);
+                addLog('❌ Error: ' + error.message, 'error');
+                document.getElementById('modelStatus').textContent = '❌ Failed';
+            }
+        }
+
+        // Toggle listening
+        async function toggleListening() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        // Start listening
+        function startListening() {
+            if (!recognizer) {
+                addLog('❌ Model not ready', 'error');
+                return;
+            }
+
+            try {
+                isListening = true;
+                const btn = document.getElementById('micBtn');
+                btn.classList.add('listening');
+                document.getElementById('micLabel').textContent = '🔴 Say: UP, DOWN, LEFT, RIGHT, STOP';
+                
+                recognizer.listen(result => {
+                    const scores = Array.from(result.scores);
+                    const words = recognizer.wordLabels();
+                    
+                    let maxScore = 0;
+                    let detectedWord = null;
+                    
+                    // Find the word with highest score from our allowed words
+                    words.forEach((word, index) => {
+                        if (WORD_TO_COMMAND[word.toLowerCase()] && scores[index] > maxScore) {
+                            maxScore = scores[index];
+                            detectedWord = word.toLowerCase();
+                        }
+                    });
+                    
+                    if (detectedWord && maxScore > 0.75) {
+                        const command = WORD_TO_COMMAND[detectedWord];
+                        const confidence = (maxScore * 100).toFixed(1);
+                        
+                        document.getElementById('detectedCommand').textContent = detectedWord.toUpperCase();
+                        document.getElementById('confidence').textContent = `${confidence}% → ${command.toUpperCase()}`;
+                        
+                        addLog(`✅ ${detectedWord.toUpperCase()} (${confidence}%) → ${command.toUpperCase()}`, 'success');
+                        handleCommand(command);
+                    }
+                }, {
+                    includeSpectrogram: false,
+                    probabilityThreshold: 0.75,
+                    invokeCallbackOnNoiseAndUnknown: false,
+                    overlapFactor: 0.5
+                });
+                
+                addLog('🎙️ Listening... Say: UP, DOWN, LEFT, RIGHT, STOP', 'info');
+            } catch (error) {
+                addLog('❌ Listen error: ' + error.message, 'error');
+                stopListening();
+            }
+        }
+
+        // Stop listening
+        function stopListening() {
+            if (recognizer) {
+                try {
+                    recognizer.stopListening();
+                } catch (e) {
+                    console.error('Stop error:', e);
+                }
+            }
+            
+            isListening = false;
+            const btn = document.getElementById('micBtn');
+            btn.classList.remove('listening');
+            document.getElementById('micLabel').textContent = 'Press to Start';
+            
+            addLog('⏹️ Stopped', 'info');
+        }
+
+        // Handle command
+        function handleCommand(command) {
+            const esp32Command = COMMAND_TO_ESP32[command];
+            
+            if (esp32Command) {
+                sendToESP32(command, esp32Command);
+                
+                // Highlight button
+                document.querySelectorAll('.cmd-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Map command back to button text
+                let buttonWord = command;
+                if (command === 'forward') buttonWord = 'up';
+                if (command === 'backward') buttonWord = 'down';
+                
+                const matchingBtn = Array.from(document.querySelectorAll('.cmd-btn'))
+                    .find(btn => btn.textContent.toLowerCase().includes(buttonWord));
+                
+                if (matchingBtn) {
+                    matchingBtn.classList.add('active');
+                    setTimeout(() => matchingBtn.classList.remove('active'), 1000);
+                }
+            }
+        }
+
+        // Test command
+        function testCommand(word) {
+            const command = word === 'up' ? 'forward' : word === 'down' ? 'backward' : word;
+            document.getElementById('detectedCommand').textContent = word.toUpperCase();
+            document.getElementById('confidence').textContent = `95.0% → ${command.toUpperCase()}`;
+            addLog(`🧪 Test: ${word.toUpperCase()} → ${command.toUpperCase()}`, 'info');
+            handleCommand(command);
+        }
+
+        // Bluetooth
+        async function toggleBluetooth() {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                disconnectBluetooth();
+            } else {
+                await connectBluetooth();
+            }
+        }
+
+        async function connectBluetooth() {
+            try {
+                addLog('🔍 Scanning for ESP32...', 'info');
+                
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'ESP32' }],
+                    optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+                });
+                
+                addLog('📱 Found: ' + bluetoothDevice.name, 'success');
+                
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+                bluetoothCharacteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+                
+                document.getElementById('bluetoothStatus').textContent = '✅ Connected: ' + bluetoothDevice.name;
+                document.getElementById('bluetoothBtn').textContent = '❌ Disconnect';
+                document.getElementById('bluetoothBtn').classList.add('connected');
+                
+                addLog('✅ Bluetooth connected!', 'success');
+                
+            } catch (error) {
+                addLog('❌ Bluetooth: ' + error.message, 'error');
+            }
+        }
+
+        function disconnectBluetooth() {
+            if (bluetoothDevice) {
+                bluetoothDevice.gatt.disconnect();
+                bluetoothDevice = null;
+                bluetoothCharacteristic = null;
+                
+                document.getElementById('bluetoothStatus').textContent = 'Not Connected';
+                document.getElementById('bluetoothBtn').textContent = '📡 Connect to ESP32';
+                document.getElementById('bluetoothBtn').classList.remove('connected');
+                
+                addLog('❌ Disconnected', 'info');
+            }
+        }
+
+        async function sendToESP32(command, esp32Command) {
+            if (!bluetoothCharacteristic) {
+                addLog('⚠️ Bluetooth not connected', 'warning');
+                return;
+            }
+            
+            try {
+                const data = new TextEncoder().encode(esp32Command);
+                await bluetoothCharacteristic.writeValue(data);
+                addLog(`📤 Sent to ESP32: ${esp32Command} (${command})`, 'success');
+            } catch (error) {
+                addLog('❌ Send failed: ' + error.message, 'error');
+            }
+        }
+
+        // Logging
+        function addLog(message, type = 'info') {
+            const logBox = document.getElementById('logBox');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logBox.insertBefore(entry, logBox.firstChild);
+            
+            while (logBox.children.length > 30) {
+                logBox.removeChild(logBox.lastChild);
+            }
+        }
+
+        // Start on load
+        window.addEventListener('load', () => {
+            setTimeout(init, 100);
+        });
+    </script>
+</body>
+</html>
