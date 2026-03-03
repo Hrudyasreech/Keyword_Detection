@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Command Detector</title>
+    <title>Wheelchair Control - Voice & Gesture</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.20.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js"></script>
     <style>
@@ -15,44 +15,79 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f4c75 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
+            color: #fff;
         }
 
         .container {
-            background: white;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             padding: 40px;
-            max-width: 600px;
+            max-width: 700px;
             width: 100%;
         }
 
         h1 {
-            color: #333;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             text-align: center;
-            margin-bottom: 10px;
-            font-size: 28px;
+            margin-bottom: 8px;
+            font-size: 32px;
+            font-weight: 700;
         }
 
         .subtitle {
             text-align: center;
-            color: #666;
+            color: #94a3b8;
             margin-bottom: 30px;
             font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .mode-indicator {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 25px;
+            justify-content: center;
+        }
+
+        .mode-badge {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: rgba(100, 116, 139, 0.2);
+            color: #94a3b8;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .mode-badge.active {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
 
         .status-box {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(6, 182, 212, 0.1));
+            border: 1px solid rgba(59, 130, 246, 0.3);
             padding: 30px;
             border-radius: 15px;
             margin-bottom: 25px;
             text-align: center;
-            color: white;
         }
 
         .status-label {
@@ -60,223 +95,330 @@
             text-transform: uppercase;
             letter-spacing: 2px;
             margin-bottom: 10px;
-            opacity: 0.9;
+            color: #94a3b8;
         }
 
         .detected-command {
-            font-size: 48px;
+            font-size: 56px;
             font-weight: bold;
-            min-height: 60px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            min-height: 70px;
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            margin: 10px 0;
         }
 
         .confidence {
             font-size: 14px;
+            color: #64748b;
             margin-top: 10px;
-            opacity: 0.9;
         }
 
-        .info-box {
-            background: #e3f2fd;
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .info-card {
+            background: rgba(100, 116, 139, 0.1);
+            border: 1px solid rgba(148, 163, 184, 0.2);
             padding: 15px;
             border-radius: 10px;
-            margin-bottom: 20px;
-            border-left: 4px solid #2196f3;
+            text-align: center;
         }
 
         .info-label {
-            color: #1565c0;
-            font-weight: bold;
-            font-size: 12px;
-            margin-bottom: 5px;
+            color: #94a3b8;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
         }
 
-        .info-text {
-            color: #0d47a1;
-            font-size: 14px;
+        .info-value {
+            color: #3b82f6;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .control-section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .mic-button {
-            width: 120px;
-            height: 120px;
+            width: 140px;
+            height: 140px;
             border-radius: 50%;
-            border: none;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            font-size: 48px;
+            border: 2px solid rgba(59, 130, 246, 0.5);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2));
+            color: #3b82f6;
+            font-size: 56px;
             cursor: pointer;
             margin: 30px auto;
             display: block;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .mic-button:hover:not(:disabled) {
-            transform: scale(1.05);
-            box-shadow: 0 12px 24px rgba(0,0,0,0.3);
+            transform: scale(1.08);
+            box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4);
+            border-color: rgba(59, 130, 246, 1);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(6, 182, 212, 0.3));
         }
 
         .mic-button:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
 
         .mic-button.listening {
-            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(249, 115, 22, 0.3));
+            border-color: rgba(239, 68, 68, 0.8);
+            color: #ef4444;
             animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
             0%, 100% { 
                 transform: scale(1);
-                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+                box-shadow: 0 8px 24px rgba(239, 68, 68, 0.2);
             }
             50% { 
-                transform: scale(1.08);
-                box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+                transform: scale(1.1);
+                box-shadow: 0 12px 36px rgba(239, 68, 68, 0.4);
             }
+        }
+
+        .mic-label {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px;
+            margin-top: -20px;
+            margin-bottom: 20px;
         }
 
         .bluetooth-btn {
             width: 100%;
-            padding: 18px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: bold;
+            padding: 16px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
             cursor: pointer;
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
             margin-bottom: 20px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .bluetooth-btn:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.6);
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
         }
 
         .bluetooth-btn.connected {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            background: rgba(34, 197, 94, 0.2);
+            border-color: rgba(34, 197, 94, 0.5);
+            color: #22c55e;
         }
 
         .commands-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
-            margin: 20px 0;
+            margin: 15px 0;
         }
 
         .cmd-btn {
-            padding: 15px;
-            background: white;
-            border: 2px solid #e0e0e0;
+            padding: 16px;
+            background: rgba(100, 116, 139, 0.1);
+            border: 1px solid rgba(148, 163, 184, 0.2);
             border-radius: 10px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             transition: all 0.3s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #94a3b8;
+            text-align: center;
         }
 
         .cmd-btn:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
+            border-color: rgba(59, 130, 246, 0.6);
+            background: rgba(59, 130, 246, 0.1);
+            transform: translateY(-3px);
         }
 
         .cmd-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: #667eea;
-            transform: scale(1.05);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(6, 182, 212, 0.3));
+            color: #06b6d4;
+            border-color: rgba(6, 182, 212, 0.6);
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
         }
 
         .log-box {
-            background: #f5f5f5;
-            border: 1px solid #ddd;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
             border-radius: 10px;
             padding: 15px;
-            max-height: 180px;
+            max-height: 200px;
             overflow-y: auto;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 11px;
         }
 
         .log-entry {
-            margin-bottom: 5px;
-            padding: 5px 8px;
+            margin-bottom: 6px;
+            padding: 6px 10px;
             border-radius: 4px;
+            border-left: 3px solid;
         }
 
-        .log-success { background: #c8e6c9; color: #2e7d32; }
-        .log-error { background: #ffcdd2; color: #c62828; }
-        .log-info { background: #bbdefb; color: #1565c0; }
-        .log-warning { background: #fff9c4; color: #f57f17; }
-
-        .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #666;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        .log-success { 
+            background: rgba(34, 197, 94, 0.15);
+            color: #86efac;
+            border-color: #22c55e;
         }
 
-        .mic-label {
-            text-align: center;
-            color: #666;
-            font-size: 14px;
-            margin-top: -15px;
-            margin-bottom: 20px;
+        .log-error { 
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            border-color: #ef4444;
         }
 
+        .log-info { 
+            background: rgba(59, 130, 246, 0.15);
+            color: #93c5fd;
+            border-color: #3b82f6;
+        }
 
+        .log-warning { 
+            background: rgba(249, 115, 22, 0.15);
+            color: #fdba74;
+            border-color: #f97316;
+        }
+
+        .log-voice {
+            background: rgba(168, 85, 247, 0.15);
+            color: #d8b4fe;
+            border-color: #a855f7;
+        }
+
+        .gesture-indicator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(100, 116, 139, 0.1);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .gesture-status {
+            color: #94a3b8;
+        }
+
+        .gesture-value {
+            color: #06b6d4;
+            font-weight: 600;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(100, 116, 139, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.5);
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 Voice Command AI</h1>
-        <p class="subtitle">Say: UP, DOWN, LEFT, RIGHT, STOP</p>
+        <h1>♿ Wheelchair Control</h1>
+        <p class="subtitle">Voice & Gesture Unified Control</p>
+
+        <div class="mode-indicator">
+            <div class="mode-badge" id="voiceBadge">🎤 Voice Ready</div>
+            <div class="mode-badge" id="gestureBadge">🎯 Gesture Ready</div>
+        </div>
 
         <div class="status-box">
-            <div class="status-label">Detected Command</div>
+            <div class="status-label">Current Command</div>
             <div class="detected-command" id="detectedCommand">---</div>
             <div class="confidence" id="confidence"></div>
         </div>
 
-        <div class="info-box">
-            <div class="info-label">🤖 Model Status</div>
-            <div class="info-text" id="modelStatus">Initializing...</div>
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="info-label">🤖 Model</div>
+                <div class="info-value" id="modelStatus">Loading...</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">📡 Bluetooth</div>
+                <div class="info-value" id="bluetoothStatus">Offline</div>
+            </div>
         </div>
 
-
-
-        <div class="info-box">
-            <div class="info-label">📡 Bluetooth Status</div>
-            <div class="info-text" id="bluetoothStatus">Not Connected</div>
+        <div class="control-section">
+            <div class="section-title">🎤 Voice Control</div>
+            <button class="mic-button" id="micBtn" onclick="toggleListening()" disabled>
+                🎙️
+            </button>
+            <div class="mic-label" id="micLabel">Loading Model...</div>
         </div>
-
-        <button class="mic-button" id="micBtn" onclick="toggleListening()" disabled>
-            🎙️
-        </button>
-        <div class="mic-label" id="micLabel">Loading...</div>
 
         <button class="bluetooth-btn" id="bluetoothBtn" onclick="toggleBluetooth()">
             📡 Connect to ESP32
         </button>
 
-        <div class="section-title">Quick Test Commands</div>
-        <div class="commands-grid">
-            <button class="cmd-btn" onclick="testCommand('up')">⬆️ UP<br>(Forward)</button>
-            <button class="cmd-btn" onclick="testCommand('down')">⬇️ DOWN<br>(Backward)</button>
-            <button class="cmd-btn" onclick="testCommand('left')">⬅️ LEFT</button>
-            <button class="cmd-btn" onclick="testCommand('right')">➡️ RIGHT</button>
-            <button class="cmd-btn" onclick="testCommand('stop')">🛑 STOP</button>
+        <div class="gesture-indicator">
+            <span class="gesture-status">🎯 Gesture Input:</span>
+            <span class="gesture-value" id="gestureValue">Waiting...</span>
         </div>
 
-        <div class="section-title">Activity Log</div>
-        <div class="log-box" id="logBox"></div>
+        <div class="control-section">
+            <div class="section-title">⚡ Quick Test</div>
+            <div class="commands-grid">
+                <button class="cmd-btn" onclick="testCommand('forward')">⬆️ Forward</button>
+                <button class="cmd-btn" onclick="testCommand('backward')">⬇️ Backward</button>
+                <button class="cmd-btn" onclick="testCommand('left')">⬅️ Left</button>
+                <button class="cmd-btn" onclick="testCommand('right')">➡️ Right</button>
+                <button class="cmd-btn" onclick="testCommand('stop')">🛑 Stop</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <div class="section-title">📋 Activity Log</div>
+            <div class="log-box" id="logBox"></div>
+        </div>
     </div>
 
     <script>
@@ -284,9 +426,9 @@
         let isListening = false;
         let bluetoothDevice = null;
         let bluetoothCharacteristic = null;
+        let lastGestureTime = 0;
+        const GESTURE_TIMEOUT = 2000; // 2 seconds to consider gesture "active"
 
-        // Map model words to our commands
-        // Model has: up, down, left, right, stop, go, yes, no, etc.
         const WORD_TO_COMMAND = {
             'up': 'forward',
             'go': 'forward',
@@ -304,11 +446,10 @@
             'stop': 'S'
         };
 
-        // Initialize model
+        // ==================== INITIALIZATION ====================
         async function init() {
             try {
                 addLog('🔄 Loading TensorFlow.js...', 'info');
-                addLog('TF version: ' + tf.version.tfjs, 'info');
                 
                 if (typeof speechCommands === 'undefined') {
                     throw new Error('speech-commands library not loaded');
@@ -318,27 +459,53 @@
                 recognizer = speechCommands.create('BROWSER_FFT');
                 
                 addLog('🔄 Loading model...', 'info');
-                document.getElementById('modelStatus').textContent = '⏳ Downloading...';
+                document.getElementById('modelStatus').textContent = '⏳ Loading...';
                 
                 await recognizer.ensureModelLoaded();
                 
                 const words = recognizer.wordLabels();
-                addLog(`✅ Model loaded with ${words.length} words`, 'success');
-                addLog(`Available: ${words.join(', ')}`, 'info');
-                addLog(`📢 SAY: UP, DOWN, LEFT, RIGHT, STOP`, 'warning');
+                addLog(`✅ Model ready with ${words.length} words`, 'success');
+                addLog(`Say: UP, DOWN, LEFT, RIGHT, STOP`, 'warning');
                 
-                document.getElementById('modelStatus').textContent = '✅ Ready!';
+                document.getElementById('modelStatus').textContent = '✅ Ready';
                 document.getElementById('micBtn').disabled = false;
-                document.getElementById('micLabel').textContent = 'Press to Start';
+                document.getElementById('micLabel').textContent = 'Click to Listen';
+                document.getElementById('voiceBadge').classList.add('active');
+                
+                // Listen for gesture inputs via ESP-NOW messages (simulated here)
+                setupGestureListener();
                 
             } catch (error) {
                 console.error('Full error:', error);
-                addLog('❌ Error: ' + error.message, 'error');
+                addLog('❌ Model Error: ' + error.message, 'error');
                 document.getElementById('modelStatus').textContent = '❌ Failed';
             }
         }
 
-        // Toggle listening
+        // ==================== GESTURE LISTENER ====================
+        function setupGestureListener() {
+            // This listens for gesture commands from the gesture TX ESP32
+            // In a real scenario, the RX ESP32 would relay these via BLE or websocket
+            window.addEventListener('gesture', (e) => {
+                lastGestureTime = Date.now();
+                const gesture = e.detail.command;
+                addLog(`🎯 Gesture Detected: ${gesture.toUpperCase()}`, 'gesture');
+                document.getElementById('gestureValue').textContent = gesture.toUpperCase();
+                
+                // Highlight button
+                handleCommand(gesture);
+            });
+        }
+
+        // Simulate receiving gesture from ESP32 (you'll replace this with actual BLE/WebSocket)
+        function simulateGesture(command) {
+            lastGestureTime = Date.now();
+            document.getElementById('gestureValue').textContent = command.toUpperCase();
+            addLog(`🎯 Gesture Detected: ${command.toUpperCase()}`, 'gesture');
+            handleCommand(command);
+        }
+
+        // ==================== VOICE CONTROL ====================
         async function toggleListening() {
             if (isListening) {
                 stopListening();
@@ -347,7 +514,6 @@
             }
         }
 
-        // Start listening
         function startListening() {
             if (!recognizer) {
                 addLog('❌ Model not ready', 'error');
@@ -358,7 +524,8 @@
                 isListening = true;
                 const btn = document.getElementById('micBtn');
                 btn.classList.add('listening');
-                document.getElementById('micLabel').textContent = '🔴 Say: UP, DOWN, LEFT, RIGHT, STOP';
+                document.getElementById('micLabel').textContent = '🔴 Listening...';
+                document.getElementById('voiceBadge').classList.add('active');
                 
                 recognizer.listen(result => {
                     const scores = Array.from(result.scores);
@@ -367,7 +534,6 @@
                     let maxScore = 0;
                     let detectedWord = null;
                     
-                    // Find the word with highest score from our allowed words
                     words.forEach((word, index) => {
                         if (WORD_TO_COMMAND[word.toLowerCase()] && scores[index] > maxScore) {
                             maxScore = scores[index];
@@ -382,7 +548,7 @@
                         document.getElementById('detectedCommand').textContent = detectedWord.toUpperCase();
                         document.getElementById('confidence').textContent = `${confidence}% → ${command.toUpperCase()}`;
                         
-                        addLog(`✅ ${detectedWord.toUpperCase()} (${confidence}%) → ${command.toUpperCase()}`, 'success');
+                        addLog(`✅ Voice: ${detectedWord.toUpperCase()} (${confidence}%)`, 'success');
                         handleCommand(command);
                     }
                 }, {
@@ -392,14 +558,13 @@
                     overlapFactor: 0.5
                 });
                 
-                addLog('🎙️ Listening... Say: UP, DOWN, LEFT, RIGHT, STOP', 'info');
+                addLog('🎤 Voice listening active', 'info');
             } catch (error) {
                 addLog('❌ Listen error: ' + error.message, 'error');
                 stopListening();
             }
         }
 
-        // Stop listening
         function stopListening() {
             if (recognizer) {
                 try {
@@ -412,12 +577,12 @@
             isListening = false;
             const btn = document.getElementById('micBtn');
             btn.classList.remove('listening');
-            document.getElementById('micLabel').textContent = 'Press to Start';
+            document.getElementById('micLabel').textContent = 'Click to Listen';
             
-            addLog('⏹️ Stopped', 'info');
+            addLog('⏹️ Voice stopped', 'info');
         }
 
-        // Handle command
+        // ==================== COMMAND HANDLING ====================
         function handleCommand(command) {
             const esp32Command = COMMAND_TO_ESP32[command];
             
@@ -429,31 +594,24 @@
                     btn.classList.remove('active');
                 });
                 
-                // Map command back to button text
-                let buttonWord = command;
-                if (command === 'forward') buttonWord = 'up';
-                if (command === 'backward') buttonWord = 'down';
-                
                 const matchingBtn = Array.from(document.querySelectorAll('.cmd-btn'))
-                    .find(btn => btn.textContent.toLowerCase().includes(buttonWord));
+                    .find(btn => btn.textContent.toLowerCase().includes(command.toLowerCase()));
                 
                 if (matchingBtn) {
                     matchingBtn.classList.add('active');
-                    setTimeout(() => matchingBtn.classList.remove('active'), 1000);
+                    setTimeout(() => matchingBtn.classList.remove('active'), 800);
                 }
             }
         }
 
-        // Test command
-        function testCommand(word) {
-            const command = word === 'up' ? 'forward' : word === 'down' ? 'backward' : word;
-            document.getElementById('detectedCommand').textContent = word.toUpperCase();
-            document.getElementById('confidence').textContent = `95.0% → ${command.toUpperCase()}`;
-            addLog(`🧪 Test: ${word.toUpperCase()} → ${command.toUpperCase()}`, 'info');
+        function testCommand(command) {
+            document.getElementById('detectedCommand').textContent = command.toUpperCase();
+            document.getElementById('confidence').textContent = '95.0%';
+            addLog(`🧪 Test: ${command.toUpperCase()}`, 'info');
             handleCommand(command);
         }
 
-        // Bluetooth
+        // ==================== BLUETOOTH ====================
         async function toggleBluetooth() {
             if (bluetoothDevice && bluetoothDevice.gatt.connected) {
                 disconnectBluetooth();
@@ -477,14 +635,20 @@
                 const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
                 bluetoothCharacteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
                 
-                document.getElementById('bluetoothStatus').textContent = '✅ Connected: ' + bluetoothDevice.name;
+                document.getElementById('bluetoothStatus').textContent = '✅ Connected';
                 document.getElementById('bluetoothBtn').textContent = '❌ Disconnect';
                 document.getElementById('bluetoothBtn').classList.add('connected');
                 
                 addLog('✅ Bluetooth connected!', 'success');
                 
+                // Listen for disconnection
+                bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+                    disconnectBluetooth();
+                });
+                
             } catch (error) {
-                addLog('❌ Bluetooth: ' + error.message, 'error');
+                addLog('❌ Bluetooth Error: ' + error.message, 'error');
+                document.getElementById('bluetoothStatus').textContent = '❌ Failed';
             }
         }
 
@@ -494,7 +658,7 @@
                 bluetoothDevice = null;
                 bluetoothCharacteristic = null;
                 
-                document.getElementById('bluetoothStatus').textContent = 'Not Connected';
+                document.getElementById('bluetoothStatus').textContent = '❌ Offline';
                 document.getElementById('bluetoothBtn').textContent = '📡 Connect to ESP32';
                 document.getElementById('bluetoothBtn').classList.remove('connected');
                 
@@ -511,13 +675,13 @@
             try {
                 const data = new TextEncoder().encode(esp32Command);
                 await bluetoothCharacteristic.writeValue(data);
-                addLog(`📤 Sent to ESP32: ${esp32Command} (${command})`, 'success');
+                addLog(`📤 ESP32 ← ${esp32Command} (${command})`, 'success');
             } catch (error) {
                 addLog('❌ Send failed: ' + error.message, 'error');
             }
         }
 
-        // Logging
+        // ==================== LOGGING ====================
         function addLog(message, type = 'info') {
             const logBox = document.getElementById('logBox');
             const entry = document.createElement('div');
@@ -526,15 +690,19 @@
             entry.textContent = `[${time}] ${message}`;
             logBox.insertBefore(entry, logBox.firstChild);
             
-            while (logBox.children.length > 30) {
+            while (logBox.children.length > 40) {
                 logBox.removeChild(logBox.lastChild);
             }
         }
 
-        // Start on load
+        // ==================== STARTUP ====================
         window.addEventListener('load', () => {
             setTimeout(init, 100);
+            addLog('🚀 System initialized', 'info');
         });
+
+        // For testing: expose gesture simulator to console
+        window.testGesture = simulateGesture;
     </script>
 </body>
 </html>
